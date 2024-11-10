@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(hlmv)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
 
@@ -25,6 +25,10 @@ add_executable( ${PROJECT_NAME}
         src/mathlib.cpp
         src/mathlib.h
         src/studio.h
+        
+        src/GoldSrcModel.cpp
+        src/GoldSrcModel.h
 )
 
+target_include_directories(${PROJECT_NAME} PRIVATE deps/glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw)
