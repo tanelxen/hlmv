@@ -17,6 +17,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 #include "GoldSrcModel.h"
 #include "Renderer.h"
 
@@ -34,6 +38,11 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
+
+ImVec4 clear_color = ImColor(114, 144, 154);
+
+void imgui_init(GLFWwindow* window);
+void imgui_draw();
 
 int main()
 {
@@ -77,6 +86,8 @@ int main()
     const unsigned char* device = glGetString(GL_RENDERER);
     printf("device: %s\n", device);
     
+    imgui_init(window);
+    
     glfwSwapInterval(1);
 
     glEnable(GL_DEPTH_TEST);
@@ -109,6 +120,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         renderer.draw(deltaTime);
+        imgui_draw();
 
 		// Swap front and back buffers
 		glfwSwapBuffers(window);
@@ -116,9 +128,44 @@ int main()
 		// Poll for and process events
 		glfwPollEvents();
 	}
+    
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
 
     glfwDestroyWindow(window);
 	glfwTerminate();
     
 	return 0;
+}
+
+void imgui_init(GLFWwindow* window)
+{
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 150");
+
+//    setImGuiStyle();
+}
+
+void imgui_draw()
+{
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    {
+        static float f = 0.0f;
+        ImGui::Text("Hello, world!");
+        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+        ImGui::ColorEdit3("clear color", (float*)&clear_color);
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    }
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

@@ -16,6 +16,7 @@ set(CMAKE_XCODE_GENERATE_SCHEME OFF)
 # Thirdparty libraries
 add_subdirectory( deps/glad )
 add_subdirectory( deps/glfw )
+add_subdirectory( deps/imgui )
 
 add_executable( ${PROJECT_NAME}
         src/main.cpp
@@ -26,7 +27,18 @@ add_executable( ${PROJECT_NAME}
         
         src/Renderer.cpp
         src/Renderer.h
+
+        deps/imgui/backends/imgui_impl_glfw.cpp
+        deps/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE deps/glm)
-target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui)
+
+add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}/assets
+)
