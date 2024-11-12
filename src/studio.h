@@ -19,8 +19,6 @@
 #ifndef _STUDIO_H_
 #define _STUDIO_H_
 
-#include "mathlib.h"
-
 /*
 ==============================================================================
 
@@ -47,6 +45,9 @@ Studio models are position independent, so the cache manager can move them.
 #define MAXSTUDIOCONTROLLERS 8
 
 typedef unsigned char byte;
+
+typedef float vec3_t[3];    // x,y,z
+typedef float vec4_t[4];    // x,y,z,w
 
 typedef struct 
 {

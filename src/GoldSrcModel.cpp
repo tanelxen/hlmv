@@ -42,6 +42,14 @@ void Model::loadFromFile(const std::string &filename)
     readBodyparts();
     readSequence();
     
+    mstudiobone_t* pbone = (mstudiobone_t *)(m_pin + m_pheader->boneindex);
+    bones.resize(m_pheader->numbones);
+    
+    for (int i = 0; i < m_pheader->numbones; ++i)
+    {
+        bones[i] = pbone[i].parent;
+    }
+    
     free(buffer);
     fclose(fp);
 }
@@ -168,13 +176,19 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
         int vindex;
     };
     
-    int trisPos = 0;
-    
     std::vector<vert_t> verticesData;
     std::vector<unsigned int> indicesData;
     
     int textureWidth = 64;
     int textureHeight = 64;
+    
+    if (ptexture != nullptr)
+    {
+        textureWidth = ptexture->width;
+        textureHeight = ptexture->height;
+    }
+    
+    int trisPos = 0;
     
     // Processing triangle series
     while (trianglesBuffer[trisPos])
@@ -203,10 +217,13 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
             int vert = trianglesBuffer[trisPos] * 3;
 //            int normal = trianglesBuffer[trisPos + 1];
             
+            float u_offset = (float)trianglesBuffer[trisPos + 2] / textureWidth;
+            float v_offset = (float)trianglesBuffer[trisPos + 3] / textureHeight;
+            
             // Vertex data
             vert_t vertexData = {
                 .pos = {verticesBuffer[vert + 0], verticesBuffer[vert + 1], verticesBuffer[vert + 2]},
-                .uv = { trianglesBuffer[trisPos + 2] / textureWidth, trianglesBuffer[trisPos + 3] / textureHeight },
+                .uv = { u_offset, v_offset},
                 .vindex = vertIndex
             };
             
@@ -226,14 +243,18 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
                     if (j % 2 == 0)
                     {
                         // even
-                        indicesData.push_back(indicesData[indicesData.size() - 3]); // previously first one
-                        indicesData.push_back(indicesData[indicesData.size() - 1]); // last one
+                        indicesData.insert(indicesData.end(), {
+                            indicesData[indicesData.size() - 3], // previously first one
+                            indicesData[indicesData.size() - 1]  // last one
+                        });
                     }
                     else
                     {
                         // odd
-                        indicesData.push_back(indicesData[indicesData.size() - 1]); // last one
-                        indicesData.push_back(indicesData[indicesData.size() - 2]); // second to last
+                        indicesData.insert(indicesData.end(), {
+                            indicesData[indicesData.size() - 1], // last one
+                            indicesData[indicesData.size() - 2]  // second to last
+                        });
                     }
                 }
             }
@@ -254,8 +275,10 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
 
                 if (j > 2)
                 {
-                    indicesData.push_back(startVertIndex);
-                    indicesData.push_back(indicesData[indicesData.size() - 1]);
+                    indicesData.insert(indicesData.end(), {
+                        (unsigned int)startVertIndex,
+                        indicesData[indicesData.size() - 1]
+                    });
                 }
             }
 
@@ -283,7 +306,6 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
     
     mesh.vertexBuffer = meshVerts;
     mesh.indexBuffer = indicesData;
-//    mesh.textureIndex
 }
 
 void calcBoneRotation(int frame, mstudiobone_t *pbone, mstudioanim_t *panim, float *angle);
@@ -328,8 +350,10 @@ void Model::readSequence()
             
             for (int i = 0; i < m_pheader->numbones; ++i)
             {
-                frame.rotationPerBone[i] = { frame_pos[i][0], frame_pos[i][1], frame_pos[i][2] };
-                frame.positionPerBone[i] = { frame_rot_euler[i][0], frame_rot_euler[i][1], frame_rot_euler[i][2] };
+                glm::vec3 angle = { frame_rot_euler[i][0], frame_rot_euler[i][1], frame_rot_euler[i][2] };
+                
+                frame.rotationPerBone[i] = glm::quat(angle);
+                frame.positionPerBone[i] = { frame_pos[i][0], frame_pos[i][1], frame_pos[i][2] };
             }
             
             seq.frames.push_back(frame);
