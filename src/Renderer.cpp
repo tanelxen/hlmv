@@ -55,36 +55,20 @@ void Renderer::update(GLFWwindow* window)
 
 void Renderer::draw(float dt)
 {
-    Sequence& seq = sequences[2];
+    Sequence& seq = sequences[cur_seq_index];
     
-    float frameDuration = 1.0f / seq.fps;
-    m_timeAccumulator += dt;
-
-    // Если накопленное время больше или равно длительности одного кадра
-    while (m_timeAccumulator >= frameDuration)
+    cur_anim_duration = (float)seq.frames.size() / seq.fps;
+    
+    updatePose();
+    
+    cur_frame_time += dt;
+    
+    if (cur_frame_time >= cur_anim_duration)
     {
-        m_timeAccumulator -= frameDuration;
-        // Переход к следующему кадру, если достигнут конец - возвращаемся к началу
-        m_currentFrameIndex = (m_currentFrameIndex + 1) % seq.frames.size();
+        cur_frame_time = 0;
     }
     
-    Frame& frame = seq.frames[m_currentFrameIndex];
-    
-    for (int i = 0; i < bones.size(); ++i)
-    {
-        glm::mat4& transform = transforms[i];
-        
-        transform = glm::toMat4(frame.rotationPerBone[i]);
-        
-        transform[3][0] = frame.positionPerBone[i][0];
-        transform[3][1] = frame.positionPerBone[i][1];
-        transform[3][2] = frame.positionPerBone[i][2];
-        
-        if (bones[i] != -1)
-        {
-            transform = transforms[bones[i]] * transform;
-        }
-    }
+    cur_frame = (float)seq.frames.size() * (cur_frame_time / cur_anim_duration);
     
     glUseProgram(program);
     
@@ -248,6 +232,44 @@ void Renderer::uploadShader()
         printf("Shader have no uniform %s\n", "uBoneTransforms");
     }
 }
+
+void Renderer::updatePose()
+{
+    Sequence& seq = sequences[cur_seq_index];
+    
+    int currIndex = int(cur_frame);
+    int nextIndex = (currIndex + 1) % seq.frames.size();
+    
+    float factor = cur_frame - floor(cur_frame);
+    
+    Frame& curr = seq.frames[currIndex];
+    Frame& next = seq.frames[nextIndex];
+    
+    for (int i = 0; i < bones.size(); ++i)
+    {
+        glm::quat& currRotation = curr.rotationPerBone[i];
+        glm::quat& nextRotation = next.rotationPerBone[i];
+        
+        glm::vec3& currPosition = curr.positionPerBone[i];
+        glm::vec3& nextPosition = next.positionPerBone[i];
+        
+        glm::quat rotation = currRotation * (1.0f - factor) + nextRotation * factor;
+        glm::vec3 position = currPosition * (1.0f - factor) + nextPosition * factor;
+        
+        glm::mat4& transform = transforms[i];
+        transform = glm::toMat4(rotation);
+        
+        transform[3][0] = position[0];
+        transform[3][1] = position[1];
+        transform[3][2] = position[2];
+        
+        if (bones[i] != -1)
+        {
+            transform = transforms[bones[i]] * transform;
+        }
+    }
+}
+
 
 unsigned int compile_shader(unsigned int type, const char* source)
 {
