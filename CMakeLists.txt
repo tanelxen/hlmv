@@ -19,15 +19,13 @@ add_subdirectory( deps/glfw )
 
 add_executable( ${PROJECT_NAME}
         src/main.cpp
-        src/studio_model.h
-        src/studio_render.cpp
-        src/studio_utils.cpp
-        src/mathlib.cpp
-        src/mathlib.h
         src/studio.h
         
         src/GoldSrcModel.cpp
         src/GoldSrcModel.h
+        
+        src/Renderer.cpp
+        src/Renderer.h
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE deps/glm)

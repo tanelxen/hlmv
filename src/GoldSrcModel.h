@@ -10,12 +10,13 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 struct MeshVertex
 {
     glm::vec3 position; // позиция вершины до применения матрицы
     glm::vec2 texCoord;
-    int boneIndex;  // индекс матрицы в массиве sequences.frames.bonetransforms
+    uint8_t boneIndex;  // индекс матрицы в массиве sequences.frames.bonetransforms
 };
 
 struct Mesh
@@ -35,7 +36,7 @@ struct Texture
 
 struct Frame
 {
-    std::vector<glm::vec3> rotationPerBone;
+    std::vector<glm::quat> rotationPerBone;
     std::vector<glm::vec3> positionPerBone;
 };
 
