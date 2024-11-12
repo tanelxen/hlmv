@@ -37,6 +37,8 @@ private:
     void uploadTextures(const std::vector<Texture>& textures);
     void uploadMeshes(const std::vector<Mesh>& meshes);
     
+    void updatePose();
+    
     std::vector<Sequence> sequences;
     std::vector<int> bones;
     
@@ -47,8 +49,11 @@ private:
     unsigned int u_MVP_loc;
     unsigned int u_boneTransforms_loc;
     
-    int m_currentFrameIndex = 0;
-    float m_timeAccumulator = 0;
+    float cur_frame = 0;
+    float cur_frame_time = 0;
+    float cur_anim_duration = 0;
+    
+    int cur_seq_index = 0;
     
     std::vector<glm::mat4> transforms;
     
