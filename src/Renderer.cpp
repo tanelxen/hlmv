@@ -23,6 +23,8 @@
 #define GLM_ENABLE_EXPERIMENTAL 1
 #include <glm/gtx/quaternion.hpp>
 
+#include <imgui.h>
+
 void Renderer::init(const Model& model)
 {
     this->sequences = model.sequences;
@@ -33,6 +35,12 @@ void Renderer::init(const Model& model)
     uploadTextures(model.textures);
     uploadMeshes(model.meshes);
     uploadShader();
+    
+    sequenceNames.resize(sequences.size());
+
+    std::transform(sequences.begin(), sequences.end(), sequenceNames.begin(), [](Sequence& seq) {
+        return seq.name;
+    });
 }
 
 void Renderer::update(GLFWwindow* window)
@@ -151,11 +159,11 @@ void Renderer::uploadMeshes(const std::vector<Mesh>& meshes)
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
         
+        this->meshes[i].indicesCount = item.indexBuffer.size();
         this->meshes[i].tex = item.textureIndex;
         this->meshes[i].vao = vao;
         this->meshes[i].ibo = ibo;
         this->meshes[i].vbo = vbo;
-        this->meshes[i].indicesCount = item.indexBuffer.size();
     }
 }
 
@@ -268,6 +276,55 @@ void Renderer::updatePose()
     }
 }
 
+void Renderer::setCurrentSequence(std::string &name)
+{
+    for (int i = 0; i < sequences.size(); ++i)
+    {
+        if (sequences[i].name == name)
+        {
+            cur_seq_index = i;
+            cur_frame_time = 0;
+            cur_frame = 0;
+            break;
+        }
+    }
+}
+
+void Renderer::imgui_draw()
+{
+    static std::string current_item = sequenceNames[cur_seq_index];
+    ImGuiComboFlags flags = ImGuiComboFlags_NoArrowButton;
+    
+    ImGuiStyle& style = ImGui::GetStyle();
+    float w = ImGui::CalcItemWidth();
+    float spacing = style.ItemInnerSpacing.x;
+    float button_sz = ImGui::GetFrameHeight();
+    
+    ImGui::Text("Sequence");
+    ImGui::SameLine(0, 10);
+    
+    ImGui::PushItemWidth(w - spacing * 2.0f - button_sz * 2.0f);
+    
+    if (ImGui::BeginCombo("##sequence combo", current_item.c_str(), ImGuiComboFlags_None))
+    {
+        for (auto& seq : sequenceNames)
+        {
+            bool is_selected = (current_item == seq);
+            
+            if (ImGui::Selectable(seq.c_str(), is_selected))
+            {
+                current_item = seq;
+                setCurrentSequence(current_item);
+            }
+            
+            if (is_selected) ImGui::SetItemDefaultFocus();
+        }
+        
+        ImGui::EndCombo();
+    }
+    
+    ImGui::PopItemWidth();
+}
 
 unsigned int compile_shader(unsigned int type, const char* source)
 {
