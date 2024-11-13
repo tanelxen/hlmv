@@ -1,14 +1,3 @@
-/***
-*
-*	Copyright (c) 1996-2002, Valve LLC. All rights reserved.
-*
-****/
-// todo:
-// - clean up this mess
-
-// updates:
-// 1-4-98		fixed initialization
-// 23-11-2018	moved from GLUT to GLFW, reimplemented zooming
 
 // Default Libraries
 #include <stdio.h>
@@ -24,13 +13,6 @@
 #include "GoldSrcModel.h"
 #include "Renderer.h"
 
-#pragma warning( disable : 4244 ) // conversion from 'double ' to 'float ', possible loss of data
-#pragma warning( disable : 4305 ) // truncation from 'const double ' to 'float '
-
-#define APPLICATION_NAME "Half-Life 1 Model Viewer"
-#define SCREEN_WIDTH  800
-#define SCREEN_HEIGHT 800
-
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -42,7 +24,6 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 ImVec4 clear_color = ImColor(114, 144, 154);
 
 void imgui_init(GLFWwindow* window);
-void imgui_draw();
 
 int main()
 {
@@ -120,7 +101,15 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         renderer.draw(deltaTime);
-        imgui_draw();
+        
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        
+        renderer.imgui_draw();
+        
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 		// Swap front and back buffers
 		glfwSwapBuffers(window);
@@ -150,22 +139,4 @@ void imgui_init(GLFWwindow* window)
     ImGui_ImplOpenGL3_Init("#version 150");
 
 //    setImGuiStyle();
-}
-
-void imgui_draw()
-{
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    {
-        static float f = 0.0f;
-        ImGui::Text("Hello, world!");
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-        ImGui::ColorEdit3("clear color", (float*)&clear_color);
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-    }
-
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

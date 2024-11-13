@@ -11,12 +11,13 @@
 #include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include "studio.h"
 
 struct MeshVertex
 {
-    glm::vec3 position; // позиция вершины до применения матрицы
+    glm::vec3 position;
     glm::vec2 texCoord;
-    uint8_t boneIndex;  // индекс матрицы в массиве sequences.frames.bonetransforms
+    int boneIndex;
 };
 
 struct Mesh
@@ -47,8 +48,6 @@ struct Sequence
     float fps;
     float groundSpeed;
 };
-
-#include "studio.h"
 
 struct Model
 {

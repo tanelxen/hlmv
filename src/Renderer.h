@@ -31,6 +31,9 @@ struct Renderer
     void init(const Model& model);
     void update(GLFWwindow* window);
     void draw(float dt);
+    void imgui_draw();
+    
+    void setCurrentSequence(std::string& name);
     
 private:
     void uploadShader();
@@ -58,4 +61,7 @@ private:
     std::vector<glm::mat4> transforms;
     
     glm::mat4 mvp;
+    
+    //ImGui stuff
+    std::vector<std::string> sequenceNames;
 };
