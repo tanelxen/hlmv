@@ -70,7 +70,7 @@ int main()
 #endif
 
     glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-//    glfwWindowHint(GLFW_SAMPLES, 8);
+    glfwWindowHint(GLFW_SAMPLES, 8);
 
     window = glfwCreateWindow(window_width, window_height, "Demo", nullptr, nullptr);
 

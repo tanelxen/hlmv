@@ -22,7 +22,7 @@ struct RenderableMesh
     int indicesCount;
 };
 
-class GLFWwindow;
+struct GLFWwindow;
 
 struct Renderer
 {

@@ -19,7 +19,6 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL 1
 #include <glm/gtx/quaternion.hpp>
@@ -73,11 +72,10 @@ void Renderer::draw(float dt)
     glUseProgram(program);
     
     glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
+    glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)transforms.size(), GL_FALSE, &transforms[0][0][0]);
     
     for (auto& mesh : meshes)
     {
-        glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)transforms.size(), GL_FALSE, glm::value_ptr(transforms[0]));
-        
         unsigned int texId = textures[mesh.tex];
         
         glActiveTexture(GL_TEXTURE0);
@@ -148,7 +146,7 @@ void Renderer::uploadMeshes(const std::vector<Mesh>& meshes)
         glVertexAttribPointer(VERT_DIFFUSE_TEX_COORD_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, texCoord));
         
         glEnableVertexAttribArray(VERT_BONE_INDEX_LOC);
-        glVertexAttribPointer(VERT_BONE_INDEX_LOC, 1, GL_BYTE, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, boneIndex));
+        glVertexAttribIPointer(VERT_BONE_INDEX_LOC, 1, GL_INT, sizeof(MeshVertex), (void*)offsetof(MeshVertex, boneIndex));
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
