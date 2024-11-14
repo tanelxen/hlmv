@@ -17,8 +17,8 @@ static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+//    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+//        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
 ImVec4 clear_color = ImColor(114, 144, 154);
@@ -74,11 +74,7 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glFrontFace(GL_CCW);
     
-    Model mdl;
-    mdl.loadFromFile("assets/gman.mdl");
-    
     Renderer renderer;
-    renderer.init(mdl);
     
     double prevTime = 0;
     double deltaTime;

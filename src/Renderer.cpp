@@ -5,6 +5,8 @@
 //  Created by Fedor Artemenkov on 11.11.24.
 //
 
+#include <thread>
+
 #include "Renderer.h"
 #include "GoldSrcModel.h"
 
@@ -13,6 +15,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../deps/stb_image.h"
+
+#include "../deps/tinyfiledialogs.h"
 
 //#define STB_IMAGE_WRITE_IMPLEMENTATION
 //#include "../deps/stb_image_write.h"
@@ -41,6 +45,11 @@ void Renderer::init(const Model& model)
     std::transform(sequences.begin(), sequences.end(), sequenceNames.begin(), [](Sequence& seq) {
         return seq.name;
     });
+    
+    cur_frame = 0;
+    cur_frame_time = 0;
+    cur_anim_duration = 0;
+    cur_seq_index = 0;
 }
 
 void Renderer::update(GLFWwindow* window)
@@ -52,16 +61,36 @@ void Renderer::update(GLFWwindow* window)
     float fov = glm::radians(38.0f);
     glm::mat4x4 projection = glm::perspective(fov, ratio, 0.1f, 4096.0f);
     
-    glm::vec3 position = {128, -128, 128};
-    glm::vec3 center = {0, 0, 32};
-    glm::vec3 up = {0, 0, 1};
+    glm::vec3 position = {0, 48, 128};
+    glm::vec3 center = {0, 36, 0};
+    glm::vec3 up = {0, 1, 0};
     glm::mat4x4 view = glm::lookAt(position, center, up);
     
-    this->mvp = projection * view;
+    // GoldSrc/Quake coordinate system -> OpenGL
+    glm::mat4 model = {
+        { 0, 0,  1, 0 },
+        { 1, 0,  0, 0 },
+        { 0, 1,  0, 0 },
+        { 0, 0,  0, 1 }
+    };
+    
+    this->mvp = projection * view * model;
+    
+    if (hasFile)
+    {
+        hasFile = false;
+        
+        Model mdl;
+        mdl.loadFromFile(filename);
+        
+        init(mdl);
+    }
 }
 
 void Renderer::draw(float dt)
 {
+    if (cur_seq_index >= sequences.size()) return;
+    
     Sequence& seq = sequences[cur_seq_index];
     
     cur_anim_duration = (float)seq.frames.size() / seq.fps;
@@ -276,24 +305,29 @@ void Renderer::updatePose()
     }
 }
 
-void Renderer::setCurrentSequence(std::string &name)
-{
-    for (int i = 0; i < sequences.size(); ++i)
-    {
-        if (sequences[i].name == name)
-        {
-            cur_seq_index = i;
-            cur_frame_time = 0;
-            cur_frame = 0;
-            break;
-        }
-    }
-}
-
 void Renderer::imgui_draw()
 {
-    static std::string current_item = sequenceNames[cur_seq_index];
-    ImGuiComboFlags flags = ImGuiComboFlags_NoArrowButton;
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Open", "Ctrl+O"))
+            {
+                openFile([this](std::string filename) {
+                    this->filename = filename;
+                    this->hasFile = true;
+                }, "*.mdl");
+            }
+
+            if (ImGui::MenuItem("Exit")) {
+                exit(1);
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+    
+    if (cur_seq_index >= sequenceNames.size()) return;
     
     ImGuiStyle& style = ImGui::GetStyle();
     float w = ImGui::CalcItemWidth();
@@ -305,16 +339,17 @@ void Renderer::imgui_draw()
     
     ImGui::PushItemWidth(w - spacing * 2.0f - button_sz * 2.0f);
     
-    if (ImGui::BeginCombo("##sequence combo", current_item.c_str(), ImGuiComboFlags_None))
+    if (ImGui::BeginCombo("##sequence combo", sequenceNames[cur_seq_index].c_str(), ImGuiComboFlags_None))
     {
-        for (auto& seq : sequenceNames)
+        for (int i = 0; i < sequenceNames.size(); ++i)
         {
-            bool is_selected = (current_item == seq);
+            bool is_selected = (cur_seq_index == i);
             
-            if (ImGui::Selectable(seq.c_str(), is_selected))
+            if (ImGui::Selectable(sequenceNames[i].c_str(), is_selected))
             {
-                current_item = seq;
-                setCurrentSequence(current_item);
+                cur_seq_index = i;
+                cur_frame_time = 0;
+                cur_frame = 0;
             }
             
             if (is_selected) ImGui::SetItemDefaultFocus();
@@ -325,6 +360,16 @@ void Renderer::imgui_draw()
     
     ImGui::PopItemWidth();
 }
+
+void Renderer::openFile(std::function<void (std::string)> callback, const char* filter)
+{
+    std::thread f = std::thread([callback, filter]() {
+        const char* filename = tinyfd_openFileDialog(nullptr, nullptr, 1, &filter, nullptr, 0);
+        callback(std::string(filename));
+    });
+    f.detach();
+}
+
 
 unsigned int compile_shader(unsigned int type, const char* source)
 {

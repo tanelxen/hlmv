@@ -8,6 +8,8 @@
 #pragma once
 
 #include <vector>
+#include <functional>
+
 #include <glm/glm.hpp>
 
 #include "GoldSrcModel.h"
@@ -32,8 +34,6 @@ struct Renderer
     void update(GLFWwindow* window);
     void draw(float dt);
     void imgui_draw();
-    
-    void setCurrentSequence(std::string& name);
     
 private:
     void uploadShader();
@@ -64,4 +64,8 @@ private:
     
     //ImGui stuff
     std::vector<std::string> sequenceNames;
+    
+    void openFile(std::function<void(std::string)> callback, const char* filter);
+    std::string filename;
+    bool hasFile = false;
 };

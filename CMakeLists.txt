@@ -30,6 +30,8 @@ add_executable( ${PROJECT_NAME}
 
         deps/imgui/backends/imgui_impl_glfw.cpp
         deps/imgui/backends/imgui_impl_opengl3.cpp
+        
+        deps/tinyfiledialogs.c
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE deps/glm)

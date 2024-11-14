@@ -33,7 +33,7 @@ void Model::loadFromFile(const std::string &filename)
     name = m_pheader->name;
     
     printf("------------ READ HEADER --------------\n");
-    printf("loading %s\n", filename.c_str());
+    printf("filename %s\n", filename.c_str());
     printf("name: %s\n", m_pheader->name);
     printf("version: %i\n", m_pheader->version);
     printf("---------------------------------------\n");
@@ -62,10 +62,6 @@ void Model::readTextures()
     if (m_pheader->textureindex == 0) return;
     
     mstudiotexture_t* ptextures = (mstudiotexture_t *)(m_pin + m_pheader->textureindex);
-    
-    printf("------------ READ TEXTURES ------------\n");
-    printf("numtextures: %i\n", m_pheader->numtextures);
-    printf("---------------------------------------\n");
     
     for (int i = 0; i < m_pheader->numtextures; ++i)
     {
