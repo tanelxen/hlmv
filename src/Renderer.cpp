@@ -31,6 +31,7 @@
 
 void Renderer::init(const Model& model)
 {
+    this->name = model.name;
     this->sequences = model.sequences;
     this->bones = model.bones;
     
@@ -74,6 +75,7 @@ void Renderer::update(GLFWwindow* window)
         { 0, 0,  0, 1 }
     };
     
+    this->view = view;
     this->mvp = projection * view * model;
     
     if (hasFile)
@@ -109,6 +111,7 @@ void Renderer::draw(float dt)
     glUseProgram(program);
     
     glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
+    glUniformMatrix4fv(u_view_loc, 1, GL_FALSE, (const float*) &view);
     glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)transforms.size(), GL_FALSE, &transforms[0][0][0]);
     
     for (auto& mesh : meshes)
@@ -151,8 +154,9 @@ void Renderer::uploadTextures(const std::vector<Texture>& textures)
 }
 
 #define VERT_POSITION_LOC 0
-#define VERT_DIFFUSE_TEX_COORD_LOC 1
-#define VERT_BONE_INDEX_LOC 2
+#define VERT_NORMAL_LOC 1
+#define VERT_DIFFUSE_TEX_COORD_LOC 2
+#define VERT_BONE_INDEX_LOC 3
 
 void Renderer::uploadMeshes(const std::vector<Mesh>& meshes)
 {
@@ -178,6 +182,9 @@ void Renderer::uploadMeshes(const std::vector<Mesh>& meshes)
 
         glEnableVertexAttribArray(VERT_POSITION_LOC);
         glVertexAttribPointer(VERT_POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, position));
+        
+        glEnableVertexAttribArray(VERT_NORMAL_LOC);
+        glVertexAttribPointer(VERT_NORMAL_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, normal));
 
         glEnableVertexAttribArray(VERT_DIFFUSE_TEX_COORD_LOC);
         glVertexAttribPointer(VERT_DIFFUSE_TEX_COORD_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, texCoord));
@@ -203,17 +210,22 @@ void Renderer::uploadShader()
     const char* vert = R"(
         #version 410 core
         layout (location = 0) in vec4 position;
-        layout (location = 1) in vec2 texCoord;
-        layout (location = 2) in uint boneIndex;
+        layout (location = 1) in vec3 normal;
+        layout (location = 2) in vec2 texCoord;
+        layout (location = 3) in uint boneIndex;
     
         uniform mat4 uBoneTransforms[128];
         uniform mat4 uMVP;
         
         out vec2 uv;
+        out vec3 transformedNormal;
+        out vec4 transformedPosition;
 
         void main()
         {
-            gl_Position = uMVP * uBoneTransforms[boneIndex] * position;
+            transformedPosition = uBoneTransforms[boneIndex] * position;
+            transformedNormal = normalize(mat3(uBoneTransforms[boneIndex]) * normal);
+            gl_Position = uMVP * transformedPosition;
             uv = texCoord;
         }
     )";
@@ -221,6 +233,8 @@ void Renderer::uploadShader()
     const char* frag = R"(
         #version 410 core
         in vec2 uv;
+        in vec3 transformedNormal;
+        in vec4 transformedPosition;
 
         //Texture samplers
         uniform sampler2D s_texture;
@@ -230,9 +244,15 @@ void Renderer::uploadShader()
 
         void main()
         {
-            vec4 o_texture = texture(s_texture, uv);
-
-            FragColor = o_texture;
+            vec3 lightPos = vec3(128, 128, 128);
+            vec3 lightDir = normalize(lightPos - transformedPosition.xyz);
+            float nDotL = dot(transformedNormal, lightDir);
+            float shade = max(nDotL, 0.0);
+    
+            float ambient = 0.2;
+            shade = min(shade + ambient, 1.0);
+    
+            FragColor = texture(s_texture, uv) * shade;
         }
     )";
     
@@ -258,6 +278,13 @@ void Renderer::uploadShader()
     if (u_MVP_loc == -1)
     {
         printf("Shader have no uniform %s\n", "uMVP");
+    }
+    
+    u_view_loc = glGetUniformLocation(program, "uView");
+
+    if (u_view_loc == -1)
+    {
+        printf("Shader have no uniform %s\n", "uView");
     }
     
     u_boneTransforms_loc = glGetUniformLocation(program, "uBoneTransforms");
@@ -329,36 +356,45 @@ void Renderer::imgui_draw()
     
     if (cur_seq_index >= sequenceNames.size()) return;
     
-    ImGuiStyle& style = ImGui::GetStyle();
-    float w = ImGui::CalcItemWidth();
-    float spacing = style.ItemInnerSpacing.x;
-    float button_sz = ImGui::GetFrameHeight();
+    ImGui::SetNextWindowSizeConstraints(ImVec2(250, 250), ImVec2(FLT_MAX, FLT_MAX));
     
-    ImGui::Text("Sequence");
-    ImGui::SameLine(0, 10);
-    
-    ImGui::PushItemWidth(w - spacing * 2.0f - button_sz * 2.0f);
-    
-    if (ImGui::BeginCombo("##sequence combo", sequenceNames[cur_seq_index].c_str(), ImGuiComboFlags_None))
+    if (ImGui::Begin("Model Info###model"))
     {
-        for (int i = 0; i < sequenceNames.size(); ++i)
+        ImGui::Text(name.c_str());
+        
+        ImGuiStyle& style = ImGui::GetStyle();
+        float w = ImGui::CalcItemWidth();
+        float spacing = style.ItemInnerSpacing.x;
+        float button_sz = ImGui::GetFrameHeight();
+        
+        ImGui::Text("Sequence");
+        ImGui::SameLine(0, 10);
+        
+        ImGui::PushItemWidth(w - spacing * 2.0f - button_sz * 2.0f);
+        
+        if (ImGui::BeginCombo("##sequence combo", sequenceNames[cur_seq_index].c_str(), ImGuiComboFlags_None))
         {
-            bool is_selected = (cur_seq_index == i);
-            
-            if (ImGui::Selectable(sequenceNames[i].c_str(), is_selected))
+            for (int i = 0; i < sequenceNames.size(); ++i)
             {
-                cur_seq_index = i;
-                cur_frame_time = 0;
-                cur_frame = 0;
+                bool is_selected = (cur_seq_index == i);
+                
+                if (ImGui::Selectable(sequenceNames[i].c_str(), is_selected))
+                {
+                    cur_seq_index = i;
+                    cur_frame_time = 0;
+                    cur_frame = 0;
+                }
+                
+                if (is_selected) ImGui::SetItemDefaultFocus();
             }
             
-            if (is_selected) ImGui::SetItemDefaultFocus();
+            ImGui::EndCombo();
         }
         
-        ImGui::EndCombo();
+        ImGui::PopItemWidth();
+        
+        ImGui::End();
     }
-    
-    ImGui::PopItemWidth();
 }
 
 void Renderer::openFile(std::function<void (std::string)> callback, const char* filter)

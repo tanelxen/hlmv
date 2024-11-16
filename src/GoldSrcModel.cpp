@@ -105,7 +105,7 @@ void makeTexture(byte* pin, mstudiotexture_t& texInfo, Texture& texture)
     texture.height = texInfo.height;
 }
 
-void makeMesh(const std::span<int16_t>& triangles, const std::span<float>& vertices, const mstudiotexture_t* ptexture, const std::span<uint8_t>& bones, Mesh& mesh);
+void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>& verticesBuffer, const std::span<float>& normalsBuffer, const mstudiotexture_t* ptexture, const std::span<uint8_t>& bones, Mesh& mesh);
 
 void Model::readBodyparts()
 {
@@ -121,6 +121,9 @@ void Model::readBodyparts()
         {
             float* pverts = (float *)(m_pin + model.vertindex);
             std::span<float> verts(pverts, model.numverts * 3);
+            
+            float* pnorms = (float *)(m_pin + model.normindex);
+            std::span<float> norms(pnorms, model.numnorms * 3);
             
             uint8_t* pvert_infos = (uint8_t *)(m_pin + model.vertinfoindex);
             std::span<uint8_t> vert_infos(pvert_infos, model.numverts);
@@ -149,7 +152,7 @@ void Model::readBodyparts()
                     result.textureIndex = texture_index;
                 }
                 
-                makeMesh(tris, verts, ptexture, vert_infos, result);
+                makeMesh(tris, verts, norms, ptexture, vert_infos, result);
                 
                 this->meshes.push_back(result);
             }
@@ -157,7 +160,7 @@ void Model::readBodyparts()
     }
 }
 
-void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>& verticesBuffer, const mstudiotexture_t* ptexture, const std::span<uint8_t>& bones, Mesh& mesh)
+void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>& verticesBuffer, const std::span<float>& normalsBuffer, const mstudiotexture_t* ptexture, const std::span<uint8_t>& bones, Mesh& mesh)
 {
     enum class TrianglesType
     {
@@ -168,6 +171,7 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
     struct vert_t
     {
         glm::vec3 pos;
+        glm::vec3 nrm;
         glm::vec2 uv;
         int vindex;
     };
@@ -211,7 +215,7 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
         {
             int vertIndex = trianglesBuffer[trisPos];
             int vert = trianglesBuffer[trisPos] * 3;
-//            int normal = trianglesBuffer[trisPos + 1];
+            int norm = trianglesBuffer[trisPos + 1] * 3;
             
             float u_offset = (float)trianglesBuffer[trisPos + 2] / textureWidth;
             float v_offset = (float)trianglesBuffer[trisPos + 3] / textureHeight;
@@ -219,6 +223,7 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
             // Vertex data
             vert_t vertexData = {
                 .pos = {verticesBuffer[vert + 0], verticesBuffer[vert + 1], verticesBuffer[vert + 2]},
+                .nrm = {normalsBuffer[norm + 0], normalsBuffer[norm + 1], normalsBuffer[norm + 2]},
                 .uv = { u_offset, v_offset},
                 .vindex = vertIndex
             };
@@ -296,6 +301,7 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
         int boneIndex = bones[vertIndex];
         
         meshVerts[i].position = verticesData[i].pos;
+        meshVerts[i].normal = verticesData[i].nrm;
         meshVerts[i].texCoord = verticesData[i].uv;
         meshVerts[i].boneIndex = boneIndex;
     }

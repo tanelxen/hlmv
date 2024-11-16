@@ -42,6 +42,8 @@ private:
     
     void updatePose();
     
+    std::string name;
+    
     std::vector<Sequence> sequences;
     std::vector<int> bones;
     
@@ -50,6 +52,7 @@ private:
     
     unsigned int program;
     unsigned int u_MVP_loc;
+    unsigned int u_view_loc;
     unsigned int u_boneTransforms_loc;
     
     float cur_frame = 0;
@@ -60,6 +63,7 @@ private:
     
     std::vector<glm::mat4> transforms;
     
+    glm::mat4 view;
     glm::mat4 mvp;
     
     //ImGui stuff

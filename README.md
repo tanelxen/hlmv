@@ -8,6 +8,10 @@ Features:
 - ✅ switch sequences
 - ✅ slerp frames
 - ✅ GPU-skinning
+- ✅ simple lighting
 
-![screenshot](https://github.com/user-attachments/assets/816ded7e-9565-42f3-a503-4968161b0ab3)
+![screenshot](https://github.com/user-attachments/assets/b1db443c-6b54-4b37-a662-38f6fe33b236)
 
+## TODO
+- [ ] camera movement
+- [ ] support demand textures and sequences
