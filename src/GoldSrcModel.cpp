@@ -105,7 +105,16 @@ void makeTexture(byte* pin, mstudiotexture_t& texInfo, Texture& texture)
     texture.height = texInfo.height;
 }
 
-void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>& verticesBuffer, const std::span<float>& normalsBuffer, const mstudiotexture_t* ptexture, const std::span<uint8_t>& bones, Mesh& mesh);
+struct MeshData
+{
+    std::span<int16_t>& triverts;
+    std::span<float>& vertices;
+    std::span<float>& normals;
+    mstudiotexture_t* ptexture;
+    std::span<uint8_t>& boneIndices;
+};
+
+void makeMesh(const MeshData& data, Mesh& mesh);
 
 void Model::readBodyparts()
 {
@@ -152,7 +161,15 @@ void Model::readBodyparts()
                     result.textureIndex = texture_index;
                 }
                 
-                makeMesh(tris, verts, norms, ptexture, vert_infos, result);
+                MeshData data = {
+                    .triverts = tris,
+                    .vertices = verts,
+                    .normals = norms,
+                    .ptexture = ptexture,
+                    .boneIndices = vert_infos
+                };
+                
+                makeMesh(data, result);
                 
                 this->meshes.push_back(result);
             }
@@ -160,7 +177,7 @@ void Model::readBodyparts()
     }
 }
 
-void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>& verticesBuffer, const std::span<float>& normalsBuffer, const mstudiotexture_t* ptexture, const std::span<uint8_t>& bones, Mesh& mesh)
+void makeMesh(const MeshData& data, Mesh& mesh)
 {
     enum class TrianglesType
     {
@@ -182,25 +199,27 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
     int textureWidth = 64;
     int textureHeight = 64;
     
-    if (ptexture != nullptr)
+    if (data.ptexture != nullptr)
     {
-        textureWidth = ptexture->width;
-        textureHeight = ptexture->height;
+        textureWidth = data.ptexture->width;
+        textureHeight = data.ptexture->height;
     }
     
     int trisPos = 0;
     
+    int verticesCount = 0;
+    
     // Processing triangle series
-    while (trianglesBuffer[trisPos])
+    while (data.triverts[trisPos])
     {
         // Detecting triangle series type
-        TrianglesType trianglesType = trianglesBuffer[trisPos] < 0 ? TrianglesType::TRIANGLE_FAN : TrianglesType::TRIANGLE_STRIP;
+        TrianglesType trianglesType = data.triverts[trisPos] < 0 ? TrianglesType::TRIANGLE_FAN : TrianglesType::TRIANGLE_STRIP;
         
         // Starting vertex for triangle fan
         int startVertIndex = -1;
 
         // Number of following triangles
-        int trianglesNum = abs(trianglesBuffer[trisPos]);
+        int trianglesNum = abs(data.triverts[trisPos]);
         
         // This index is no longer needed,
         // we proceed to the following
@@ -213,17 +232,17 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
         // 3 — second uv coordinate
         for (int j = 0; j < trianglesNum; ++j)
         {
-            int vertIndex = trianglesBuffer[trisPos];
-            int vert = trianglesBuffer[trisPos] * 3;
-            int norm = trianglesBuffer[trisPos + 1] * 3;
+            int vertIndex = data.triverts[trisPos];
+            int vert = data.triverts[trisPos] * 3;
+            int norm = data.triverts[trisPos + 1] * 3;
             
-            float u_offset = (float)trianglesBuffer[trisPos + 2] / textureWidth;
-            float v_offset = (float)trianglesBuffer[trisPos + 3] / textureHeight;
+            float u_offset = (float)data.triverts[trisPos + 2] / textureWidth;
+            float v_offset = (float)data.triverts[trisPos + 3] / textureHeight;
             
             // Vertex data
             vert_t vertexData = {
-                .pos = {verticesBuffer[vert + 0], verticesBuffer[vert + 1], verticesBuffer[vert + 2]},
-                .nrm = {normalsBuffer[norm + 0], normalsBuffer[norm + 1], normalsBuffer[norm + 2]},
+                .pos = {data.vertices[vert + 0], data.vertices[vert + 1], data.vertices[vert + 2]},
+                .nrm = {data.normals[norm + 0], data.normals[norm + 1], data.normals[norm + 2]},
                 .uv = { u_offset, v_offset},
                 .vindex = vertIndex
             };
@@ -271,7 +290,7 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
             {
                 if (startVertIndex == -1)
                 {
-                    startVertIndex = int(verticesData.size());
+                    startVertIndex = verticesCount;
                 }
 
                 if (j > 2)
@@ -284,21 +303,20 @@ void makeMesh(const std::span<int16_t>& trianglesBuffer, const std::span<float>&
             }
 
             // New one
-            indicesData.push_back(verticesData.size());
+            indicesData.push_back(verticesCount);
             verticesData.push_back(vertexData);
+            
+            verticesCount++;
         }
     }
     
-    // Number of vertices for generating buffer
-    int vertNumber = verticesData.size();
-    
     std::vector<MeshVertex> meshVerts;
-    meshVerts.resize(vertNumber);
+    meshVerts.resize(verticesCount);
 
-    for (int i = 0; i < vertNumber; ++i)
+    for (int i = 0; i < verticesCount; ++i)
     {
         int vertIndex = verticesData[i].vindex;
-        int boneIndex = bones[vertIndex];
+        int boneIndex = data.boneIndices[vertIndex];
         
         meshVerts[i].position = verticesData[i].pos;
         meshVerts[i].normal = verticesData[i].nrm;

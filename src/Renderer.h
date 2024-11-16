@@ -14,13 +14,10 @@
 
 #include "GoldSrcModel.h"
 
-struct RenderableMesh
+struct RenderableSurface
 {
-    unsigned int vbo;
-    unsigned int ibo;
-    unsigned int vao;
     unsigned int tex;
-    
+    int bufferOffset;
     int indicesCount;
 };
 
@@ -47,7 +44,10 @@ private:
     std::vector<Sequence> sequences;
     std::vector<int> bones;
     
-    std::vector<RenderableMesh> meshes;
+    unsigned int vbo;
+    unsigned int ibo;
+    unsigned int vao;
+    std::vector<RenderableSurface> surfaces;
     std::vector<unsigned int> textures;
     
     unsigned int program;

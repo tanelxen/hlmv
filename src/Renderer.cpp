@@ -69,10 +69,10 @@ void Renderer::update(GLFWwindow* window)
     
     // GoldSrc/Quake coordinate system -> OpenGL
     glm::mat4 model = {
-        { 0, 0,  1, 0 },
-        { 1, 0,  0, 0 },
-        { 0, 1,  0, 0 },
-        { 0, 0,  0, 1 }
+        {  0,  0,  1,  0 },
+        {  1,  0,  0,  0 },
+        {  0,  1,  0,  0 },
+        {  0,  0,  0,  1 }
     };
     
     this->view = view;
@@ -114,17 +114,17 @@ void Renderer::draw(float dt)
     glUniformMatrix4fv(u_view_loc, 1, GL_FALSE, (const float*) &view);
     glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)transforms.size(), GL_FALSE, &transforms[0][0][0]);
     
-    for (auto& mesh : meshes)
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    
+    for (auto& surface : surfaces)
     {
-        unsigned int texId = textures[mesh.tex];
+        unsigned int texId = textures[surface.tex];
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texId);
         
-        glBindVertexArray(mesh.vao);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ibo);
-        
-        glDrawElements(GL_TRIANGLES, mesh.indicesCount, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, surface.indicesCount, GL_UNSIGNED_INT, (void*)surface.bufferOffset);
     }
 }
 
@@ -160,47 +160,48 @@ void Renderer::uploadTextures(const std::vector<Texture>& textures)
 
 void Renderer::uploadMeshes(const std::vector<Mesh>& meshes)
 {
-    this->meshes.resize(meshes.size());
+    std::vector<MeshVertex> vertices;
+    std::vector<unsigned int> indices;
     
-    for (int i = 0; i < meshes.size(); ++i)
+    for (auto& mesh : meshes)
     {
-        const Mesh& item = meshes[i];
+        RenderableSurface& surface = surfaces.emplace_back();
+        surface.tex = mesh.textureIndex;
+        surface.bufferOffset = (int) indices.size() * sizeof(unsigned int);
+        surface.indicesCount = (int) mesh.indexBuffer.size();
         
-        unsigned int vao;
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
+        int indicesOffset = (int) vertices.size();
         
-        unsigned int ibo;
-        glGenBuffers(1, &ibo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int) * item.indexBuffer.size(), item.indexBuffer.data(), GL_STATIC_DRAW);
-
-        unsigned int vbo;
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(MeshVertex) * item.vertexBuffer.size(), item.vertexBuffer.data(), GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(VERT_POSITION_LOC);
-        glVertexAttribPointer(VERT_POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, position));
+        for (int i = 0; i < mesh.indexBuffer.size(); ++i)
+        {
+            indices.push_back(indicesOffset + mesh.indexBuffer[i]);
+        }
         
-        glEnableVertexAttribArray(VERT_NORMAL_LOC);
-        glVertexAttribPointer(VERT_NORMAL_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, normal));
-
-        glEnableVertexAttribArray(VERT_DIFFUSE_TEX_COORD_LOC);
-        glVertexAttribPointer(VERT_DIFFUSE_TEX_COORD_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, texCoord));
-        
-        glEnableVertexAttribArray(VERT_BONE_INDEX_LOC);
-        glVertexAttribIPointer(VERT_BONE_INDEX_LOC, 1, GL_INT, sizeof(MeshVertex), (void*)offsetof(MeshVertex, boneIndex));
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-        
-        this->meshes[i].indicesCount = item.indexBuffer.size();
-        this->meshes[i].tex = item.textureIndex;
-        this->meshes[i].vao = vao;
-        this->meshes[i].ibo = ibo;
-        this->meshes[i].vbo = vbo;
+        vertices.insert(vertices.end(), mesh.vertexBuffer.begin(), mesh.vertexBuffer.end());
     }
+    
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(MeshVertex) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+    
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    
+    glEnableVertexAttribArray(VERT_POSITION_LOC);
+    glVertexAttribPointer(VERT_POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, position));
+    
+    glEnableVertexAttribArray(VERT_NORMAL_LOC);
+    glVertexAttribPointer(VERT_NORMAL_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, normal));
+
+    glEnableVertexAttribArray(VERT_DIFFUSE_TEX_COORD_LOC);
+    glVertexAttribPointer(VERT_DIFFUSE_TEX_COORD_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, texCoord));
+    
+    glEnableVertexAttribArray(VERT_BONE_INDEX_LOC);
+    glVertexAttribIPointer(VERT_BONE_INDEX_LOC, 1, GL_INT, sizeof(MeshVertex), (void*)offsetof(MeshVertex, boneIndex));
+    
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int) * indices.size(), indices.data(), GL_STATIC_DRAW);
 }
 
 unsigned int compile_shader(unsigned int type, const char* source);
@@ -360,7 +361,7 @@ void Renderer::imgui_draw()
     
     if (ImGui::Begin("Model Info###model"))
     {
-        ImGui::Text(name.c_str());
+        ImGui::Text(("Name: " + name).c_str());
         
         ImGuiStyle& style = ImGui::GetStyle();
         float w = ImGui::CalcItemWidth();
