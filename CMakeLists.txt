@@ -27,6 +27,9 @@ add_executable( ${PROJECT_NAME}
         
         src/Renderer.cpp
         src/Renderer.h
+        
+        src/RenderableModel.cpp
+        src/RenderableModel.h
 
         deps/imgui/backends/imgui_impl_glfw.cpp
         deps/imgui/backends/imgui_impl_opengl3.cpp
