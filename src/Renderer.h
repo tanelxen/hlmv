@@ -13,63 +13,35 @@
 #include <glm/glm.hpp>
 
 #include "GoldSrcModel.h"
-
-struct RenderableSurface
-{
-    unsigned int tex;
-    int bufferOffset;
-    int indicesCount;
-};
+#include "RenderableModel.h"
 
 struct GLFWwindow;
+class Camera;
 
 struct Renderer
 {
-    void init();
+    Renderer();
+    ~Renderer();
     
-    void init(const Model& model);
-    void update(GLFWwindow* window);
-    void draw(float dt);
+    void setModel(const Model& model);
+    void update(float dt);
+    void draw(const Camera& camera);
     void imgui_draw();
     
 private:
     void uploadShader();
-    void uploadTextures(const std::vector<Texture>& textures);
-    void uploadMeshes(const std::vector<Mesh>& meshes);
-    
-    void updatePose();
-    
-    std::string name;
-    
-    std::vector<Sequence> sequences;
-    std::vector<int> bones;
-    
-    unsigned int vbo;
-    unsigned int ibo;
-    unsigned int vao;
-    std::vector<RenderableSurface> surfaces;
-    std::vector<unsigned int> textures;
     
     unsigned int program;
     unsigned int u_MVP_loc;
-    unsigned int u_view_loc;
     unsigned int u_boneTransforms_loc;
     
-    float cur_frame = 0;
-    float cur_frame_time = 0;
-    float cur_anim_duration = 0;
-    
-    int cur_seq_index = 0;
-    
-    std::vector<glm::mat4> transforms;
-    
-    glm::mat4 view;
-    glm::mat4 mvp;
+    std::unique_ptr<RenderableModel> m_pmodel;
     
     //ImGui stuff
     std::vector<std::string> sequenceNames;
     
+    bool isPlayerView = false;
+    glm::vec3 weaponOffset = {0, 0, 0};
+    
     void openFile(std::function<void(std::string)> callback, const char* filter);
-    std::string filename;
-    bool hasFile = false;
 };

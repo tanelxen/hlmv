@@ -13,36 +13,11 @@
 *
 ****/
 
-
-
-
 #ifndef _STUDIO_H_
 #define _STUDIO_H_
 
-/*
-==============================================================================
 
-STUDIO MODELS
-
-Studio models are position independent, so the cache manager can move them.
-==============================================================================
-*/
- 
-
-#define MAXSTUDIOTRIANGLES	20000	// TODO: tune this
-#define MAXSTUDIOVERTS		2048	// TODO: tune this
-#define MAXSTUDIOSEQUENCES	2048	// total animation sequences -- KSH incremented
-#define MAXSTUDIOSKINS		100		// total textures
-#define MAXSTUDIOSRCBONES	512		// bones allowed at source movement
-#define MAXSTUDIOBONES		128		// total bones actually used
-#define MAXSTUDIOMODELS		32		// sub-models per model
-#define MAXSTUDIOBODYPARTS	32
-#define MAXSTUDIOGROUPS		16
-#define MAXSTUDIOANIMATIONS	2048		
-#define MAXSTUDIOMESHES		256
-#define MAXSTUDIOEVENTS		1024
-#define MAXSTUDIOPIVOTS		256
-#define MAXSTUDIOCONTROLLERS 8
+#define MAXSTUDIOBONES 128		// total bones actually used
 
 typedef unsigned char byte;
 
@@ -145,14 +120,6 @@ typedef struct
 	vec3_t				bbmin;		// bounding box
 	vec3_t				bbmax;		
 } mstudiobbox_t;
-
-#if !defined( CACHE_USER ) && !defined( QUAKEDEF_H )
-#define CACHE_USER
-typedef struct cache_user_s
-{
-	void *data;
-} cache_user_t;
-#endif
 
 //
 // demand loaded sequence groups
@@ -277,8 +244,6 @@ typedef struct
 } mstudiotexture_t;
 
 
-// skin families
-// short	index[skinfamilies][skinref]
 
 // studio models
 typedef struct
@@ -304,9 +269,6 @@ typedef struct
 } mstudiomodel_t;
 
 
-// vec3_t	boundingbox[model][bone][2];	// complex intersection info
-
-
 // meshes
 typedef struct 
 {
@@ -317,15 +279,6 @@ typedef struct
 	int					normindex;		// normal vec3_t
 } mstudiomesh_t;
 
-// triangles
-#if 0
-typedef struct 
-{
-	short				vertindex;		// index into vertex array
-	short				normindex;		// index into normal array
-	short				s,t;			// s,t position on skin
-} mstudiotrivert_t;
-#endif
 
 // lighting options
 #define STUDIO_NF_FLATSHADE		0x0001
@@ -363,8 +316,5 @@ typedef struct
 #define STUDIO_HAS_VERTICES 0x0002
 #define STUDIO_HAS_BBOX		0x0004
 #define STUDIO_HAS_CHROME	0x0008	// if any of the textures have chrome on them
-
-#define RAD_TO_STUDIO		(32768.0/M_PI)
-#define STUDIO_TO_RAD		(M_PI/32768.0)
 
 #endif

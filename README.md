@@ -13,5 +13,4 @@ Features:
 ![screenshot](https://github.com/user-attachments/assets/b1db443c-6b54-4b37-a662-38f6fe33b236)
 
 ## TODO
-- [ ] camera movement
 - [ ] support demand textures and sequences

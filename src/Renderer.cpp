@@ -9,6 +9,8 @@
 
 #include "Renderer.h"
 #include "GoldSrcModel.h"
+#include "Camera.h"
+#include "MainQueue.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -24,184 +26,77 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#define GLM_ENABLE_EXPERIMENTAL 1
-#include <glm/gtx/quaternion.hpp>
-
 #include <imgui.h>
 
-void Renderer::init(const Model& model)
+Renderer::Renderer()
 {
-    this->name = model.name;
-    this->sequences = model.sequences;
-    this->bones = model.bones;
-    
-    transforms.resize(bones.size());
-    
-    uploadTextures(model.textures);
-    uploadMeshes(model.meshes);
     uploadShader();
-    
-    sequenceNames.resize(sequences.size());
+}
 
-    std::transform(sequences.begin(), sequences.end(), sequenceNames.begin(), [](Sequence& seq) {
+Renderer::~Renderer()
+{
+    glDeleteProgram(program);
+}
+
+void Renderer::setModel(const Model& model)
+{
+    m_pmodel = std::make_unique<RenderableModel>();
+    m_pmodel->init(model);
+    
+    sequenceNames.resize(model.sequences.size());
+
+    std::transform(model.sequences.begin(), model.sequences.end(), sequenceNames.begin(), [](const Sequence& seq) {
         return seq.name;
     });
     
-    cur_frame = 0;
-    cur_frame_time = 0;
-    cur_anim_duration = 0;
-    cur_seq_index = 0;
+//    size_t lastSlashPos = model.name.rfind('/');
+//    isPlayerView = lastSlashPos != std::string::npos && model.name.substr(lastSlashPos + 1).starts_with("v_");
 }
 
-void Renderer::update(GLFWwindow* window)
+void Renderer::update(float dt)
 {
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    
-    float ratio = (float)width / height;
-    float fov = glm::radians(38.0f);
-    glm::mat4x4 projection = glm::perspective(fov, ratio, 0.1f, 4096.0f);
-    
-    glm::vec3 position = {0, 48, 128};
-    glm::vec3 center = {0, 36, 0};
-    glm::vec3 up = {0, 1, 0};
-    glm::mat4x4 view = glm::lookAt(position, center, up);
-    
-    // GoldSrc/Quake coordinate system -> OpenGL
-    glm::mat4 model = {
-        {  0,  0,  1,  0 },
-        {  1,  0,  0,  0 },
-        {  0,  1,  0,  0 },
-        {  0,  0,  0,  1 }
-    };
-    
-    this->view = view;
-    this->mvp = projection * view * model;
-    
-    if (hasFile)
-    {
-        hasFile = false;
-        
-        Model mdl;
-        mdl.loadFromFile(filename);
-        
-        init(mdl);
+    if (m_pmodel) {
+        m_pmodel->update(dt);
     }
+    
+    MainQueue::instance().poll();
 }
 
-void Renderer::draw(float dt)
+void Renderer::draw(const Camera& camera)
 {
-    if (cur_seq_index >= sequences.size()) return;
-    
-    Sequence& seq = sequences[cur_seq_index];
-    
-    cur_anim_duration = (float)seq.frames.size() / seq.fps;
-    
-    updatePose();
-    
-    cur_frame_time += dt;
-    
-    if (cur_frame_time >= cur_anim_duration)
-    {
-        cur_frame_time = 0;
-    }
-    
-    cur_frame = (float)seq.frames.size() * (cur_frame_time / cur_anim_duration);
-    
     glUseProgram(program);
     
-    glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
-    glUniformMatrix4fv(u_view_loc, 1, GL_FALSE, (const float*) &view);
-    glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)transforms.size(), GL_FALSE, &transforms[0][0][0]);
-    
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    
-    for (auto& surface : surfaces)
+    if (isPlayerView)
     {
-        unsigned int texId = textures[surface.tex];
+        glm::mat4 quakeToGL = {
+            {  0,  0, -1,  0 },
+            { -1,  0,  0,  0 },
+            {  0,  1,  0,  0 },
+            {  0,  0,  0,  1 }
+        };
         
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texId);
+        quakeToGL[3] = glm::vec4(weaponOffset, 1);
         
-        glDrawElements(GL_TRIANGLES, surface.indicesCount, GL_UNSIGNED_INT, (void*)surface.bufferOffset);
+        glm::mat4 mvp = camera.projection * quakeToGL;
+        glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
     }
-}
-
-void Renderer::uploadTextures(const std::vector<Texture>& textures)
-{
-    this->textures.resize(textures.size());
-    
-    for (int i = 0; i < textures.size(); ++i)
+    else
     {
-        const Texture& item = textures[i];
+        glm::mat4 quakeToGL = {
+            {  0,  0, -1,  0 },
+            { -1,  0,  0,  0 },
+            {  0,  1,  0,  0 },
+            {  0,  0,  0,  1 }
+        };
         
-        unsigned int id;
-        glGenTextures(1, &id);
-        glBindTexture(GL_TEXTURE_2D, id);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, item.width, item.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, item.data.data());
-        glGenerateMipmap(GL_TEXTURE_2D);
-        
-        this->textures[i] = id;
-        
-//        stbi_write_png(item.name.c_str(), item.width, item.height, 4, item.data.data(), item.width * 4);
-    }
-}
-
-#define VERT_POSITION_LOC 0
-#define VERT_NORMAL_LOC 1
-#define VERT_DIFFUSE_TEX_COORD_LOC 2
-#define VERT_BONE_INDEX_LOC 3
-
-void Renderer::uploadMeshes(const std::vector<Mesh>& meshes)
-{
-    std::vector<MeshVertex> vertices;
-    std::vector<unsigned int> indices;
-    
-    for (auto& mesh : meshes)
-    {
-        RenderableSurface& surface = surfaces.emplace_back();
-        surface.tex = mesh.textureIndex;
-        surface.bufferOffset = (int) indices.size() * sizeof(unsigned int);
-        surface.indicesCount = (int) mesh.indexBuffer.size();
-        
-        int indicesOffset = (int) vertices.size();
-        
-        for (int i = 0; i < mesh.indexBuffer.size(); ++i)
-        {
-            indices.push_back(indicesOffset + mesh.indexBuffer[i]);
-        }
-        
-        vertices.insert(vertices.end(), mesh.vertexBuffer.begin(), mesh.vertexBuffer.end());
+        glm::mat4 mvp = camera.projection * camera.view * quakeToGL;
+        glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
     }
     
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(MeshVertex) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
-    
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    
-    glEnableVertexAttribArray(VERT_POSITION_LOC);
-    glVertexAttribPointer(VERT_POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, position));
-    
-    glEnableVertexAttribArray(VERT_NORMAL_LOC);
-    glVertexAttribPointer(VERT_NORMAL_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, normal));
-
-    glEnableVertexAttribArray(VERT_DIFFUSE_TEX_COORD_LOC);
-    glVertexAttribPointer(VERT_DIFFUSE_TEX_COORD_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offsetof(MeshVertex, texCoord));
-    
-    glEnableVertexAttribArray(VERT_BONE_INDEX_LOC);
-    glVertexAttribIPointer(VERT_BONE_INDEX_LOC, 1, GL_INT, sizeof(MeshVertex), (void*)offsetof(MeshVertex, boneIndex));
-    
-    glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int) * indices.size(), indices.data(), GL_STATIC_DRAW);
+    if (m_pmodel) {
+        glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)(m_pmodel->transforms.size()), GL_FALSE, &(m_pmodel->transforms[0][0][0]));
+        m_pmodel->draw();
+    }
 }
 
 unsigned int compile_shader(unsigned int type, const char* source);
@@ -281,55 +176,11 @@ void Renderer::uploadShader()
         printf("Shader have no uniform %s\n", "uMVP");
     }
     
-    u_view_loc = glGetUniformLocation(program, "uView");
-
-    if (u_view_loc == -1)
-    {
-        printf("Shader have no uniform %s\n", "uView");
-    }
-    
     u_boneTransforms_loc = glGetUniformLocation(program, "uBoneTransforms");
 
     if (u_boneTransforms_loc == -1)
     {
         printf("Shader have no uniform %s\n", "uBoneTransforms");
-    }
-}
-
-void Renderer::updatePose()
-{
-    Sequence& seq = sequences[cur_seq_index];
-    
-    int currIndex = int(cur_frame);
-    int nextIndex = (currIndex + 1) % seq.frames.size();
-    
-    float factor = cur_frame - floor(cur_frame);
-    
-    Frame& curr = seq.frames[currIndex];
-    Frame& next = seq.frames[nextIndex];
-    
-    for (int i = 0; i < bones.size(); ++i)
-    {
-        glm::quat& currRotation = curr.rotationPerBone[i];
-        glm::quat& nextRotation = next.rotationPerBone[i];
-        
-        glm::vec3& currPosition = curr.positionPerBone[i];
-        glm::vec3& nextPosition = next.positionPerBone[i];
-        
-        glm::quat rotation = currRotation * (1.0f - factor) + nextRotation * factor;
-        glm::vec3 position = currPosition * (1.0f - factor) + nextPosition * factor;
-        
-        glm::mat4& transform = transforms[i];
-        transform = glm::toMat4(rotation);
-        
-        transform[3][0] = position[0];
-        transform[3][1] = position[1];
-        transform[3][2] = position[2];
-        
-        if (bones[i] != -1)
-        {
-            transform = transforms[bones[i]] * transform;
-        }
     }
 }
 
@@ -342,8 +193,12 @@ void Renderer::imgui_draw()
             if (ImGui::MenuItem("Open", "Ctrl+O"))
             {
                 openFile([this](std::string filename) {
-                    this->filename = filename;
-                    this->hasFile = true;
+
+                    Model mdl;
+                    mdl.loadFromFile(filename);
+                    
+                    setModel(mdl);
+                    
                 }, "*.mdl");
             }
 
@@ -355,13 +210,14 @@ void Renderer::imgui_draw()
         ImGui::EndMainMenuBar();
     }
     
-    if (cur_seq_index >= sequenceNames.size()) return;
+    if (m_pmodel == nullptr) return;
+    if (m_pmodel->getSeqIndex() >= sequenceNames.size()) return;
     
     ImGui::SetNextWindowSizeConstraints(ImVec2(250, 250), ImVec2(FLT_MAX, FLT_MAX));
     
     if (ImGui::Begin("Model Info###model"))
     {
-        ImGui::Text(("Name: " + name).c_str());
+        ImGui::Text(("Name: " + m_pmodel->name).c_str());
         
         ImGuiStyle& style = ImGui::GetStyle();
         float w = ImGui::CalcItemWidth();
@@ -373,17 +229,15 @@ void Renderer::imgui_draw()
         
         ImGui::PushItemWidth(w - spacing * 2.0f - button_sz * 2.0f);
         
-        if (ImGui::BeginCombo("##sequence combo", sequenceNames[cur_seq_index].c_str(), ImGuiComboFlags_None))
+        if (ImGui::BeginCombo("##sequence combo", sequenceNames[m_pmodel->getSeqIndex()].c_str(), ImGuiComboFlags_None))
         {
             for (int i = 0; i < sequenceNames.size(); ++i)
             {
-                bool is_selected = (cur_seq_index == i);
+                bool is_selected = (m_pmodel->getSeqIndex() == i);
                 
                 if (ImGui::Selectable(sequenceNames[i].c_str(), is_selected))
                 {
-                    cur_seq_index = i;
-                    cur_frame_time = 0;
-                    cur_frame = 0;
+                    m_pmodel->setSeqIndex(i);
                 }
                 
                 if (is_selected) ImGui::SetItemDefaultFocus();
@@ -394,17 +248,27 @@ void Renderer::imgui_draw()
         
         ImGui::PopItemWidth();
         
+        ImGui::Checkbox("Player View", &isPlayerView);
+        ImGui::InputFloat3("Weapon offset", (float*)&weaponOffset);
+        
         ImGui::End();
     }
 }
 
 void Renderer::openFile(std::function<void (std::string)> callback, const char* filter)
 {
-    std::thread f = std::thread([callback, filter]() {
+    std::thread([callback, filter]() {
+        
         const char* filename = tinyfd_openFileDialog(nullptr, nullptr, 1, &filter, nullptr, 0);
-        callback(std::string(filename));
-    });
-    f.detach();
+        
+        if (filename != nullptr)
+        {
+            MainQueue::instance().async([callback, filename] () {
+                callback(filename);
+            });
+        }
+        
+    }).detach();
 }
 
 
