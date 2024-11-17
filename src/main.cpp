@@ -12,6 +12,7 @@
 
 #include "GoldSrcModel.h"
 #include "Renderer.h"
+#include "Camera.h"
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
@@ -74,6 +75,7 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glFrontFace(GL_CCW);
     
+    Camera camera(window);
     Renderer renderer;
     
     double prevTime = 0;
@@ -89,14 +91,17 @@ int main()
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         
-        renderer.update(window);
+        camera.updateViewport(width, height);
+        camera.update(deltaTime);
+        
+        renderer.update(deltaTime);
         
         glViewport(0, 0, width, height);
         
         glClearColor(0.1, 0.1, 0.1, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        renderer.draw(deltaTime);
+        renderer.draw(camera);
         
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();

@@ -16,6 +16,7 @@
 #include "RenderableModel.h"
 
 struct GLFWwindow;
+class Camera;
 
 struct Renderer
 {
@@ -23,8 +24,8 @@ struct Renderer
     ~Renderer();
     
     void setModel(const Model& model);
-    void update(GLFWwindow* window);
-    void draw(float dt);
+    void update(float dt);
+    void draw(const Camera& camera);
     void imgui_draw();
     
 private:
@@ -34,12 +35,12 @@ private:
     unsigned int u_MVP_loc;
     unsigned int u_boneTransforms_loc;
     
-    glm::mat4 mvp;
-    
     std::unique_ptr<RenderableModel> m_pmodel;
     
     //ImGui stuff
     std::vector<std::string> sequenceNames;
+    
+    bool isPlayerView = false;
     
     void openFile(std::function<void(std::string)> callback, const char* filter);
     std::string filename;

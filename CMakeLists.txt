@@ -30,6 +30,9 @@ add_executable( ${PROJECT_NAME}
         
         src/RenderableModel.cpp
         src/RenderableModel.h
+        
+        src/Camera.cpp
+        src/Camera.h
 
         deps/imgui/backends/imgui_impl_glfw.cpp
         deps/imgui/backends/imgui_impl_opengl3.cpp

@@ -9,6 +9,7 @@
 
 #include "Renderer.h"
 #include "GoldSrcModel.h"
+#include "Camera.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -46,31 +47,16 @@ void Renderer::setModel(const Model& model)
     std::transform(model.sequences.begin(), model.sequences.end(), sequenceNames.begin(), [](const Sequence& seq) {
         return seq.name;
     });
+    
+//    size_t lastSlashPos = model.name.rfind('/');
+//    isPlayerView = lastSlashPos != std::string::npos && model.name.substr(lastSlashPos + 1).starts_with("v_");
 }
 
-void Renderer::update(GLFWwindow* window)
+void Renderer::update(float dt)
 {
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    
-    float ratio = (float)width / height;
-    float fov = glm::radians(38.0f);
-    glm::mat4x4 projection = glm::perspective(fov, ratio, 0.1f, 4096.0f);
-    
-    glm::vec3 position = {0, 48, 128};
-    glm::vec3 center = {0, 36, 0};
-    glm::vec3 up = {0, 1, 0};
-    glm::mat4x4 view = glm::lookAt(position, center, up);
-    
-    // GoldSrc/Quake coordinate system -> OpenGL
-    glm::mat4 model = {
-        {  0,  0,  1,  0 },
-        {  1,  0,  0,  0 },
-        {  0,  1,  0,  0 },
-        {  0,  0,  0,  1 }
-    };
-    
-    this->mvp = projection * view * model;
+    if (m_pmodel) {
+        m_pmodel->update(dt);
+    }
     
     if (hasFile)
     {
@@ -83,18 +69,42 @@ void Renderer::update(GLFWwindow* window)
     }
 }
 
-void Renderer::draw(float dt)
+void Renderer::draw(const Camera& camera)
 {
-    if (m_pmodel == nullptr) return;
-    
-    m_pmodel->update(dt);
-    
     glUseProgram(program);
     
-    glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
-    glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)(m_pmodel->transforms.size()), GL_FALSE, &(m_pmodel->transforms[0][0][0]));
+    if (isPlayerView)
+    {
+        float zOffset = -8;
+        
+        glm::mat4 weaponMatrix = {
+            {  0,  0, -1,       0 },
+            { -1,  0,  0,       0 },
+            {  0,  1,  0,       0 },
+            {  0,  0,  zOffset, 1 }
+        };
+        
+        glm::mat4 mvp = camera.projection * weaponMatrix;
+        glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
+    }
+    else
+    {
+        // GoldSrc/Quake coordinate system -> OpenGL
+        glm::mat4 quakeToGL = {
+            {  0,  0,  1,  0 },
+            {  1,  0,  0,  0 },
+            {  0,  1,  0,  0 },
+            {  0,  0,  0,  1 }
+        };
+        
+        glm::mat4 mvp = camera.projection * camera.view * quakeToGL;
+        glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
+    }
     
-    m_pmodel->draw();
+    if (m_pmodel) {
+        glUniformMatrix4fv(u_boneTransforms_loc, (GLsizei)(m_pmodel->transforms.size()), GL_FALSE, &(m_pmodel->transforms[0][0][0]));
+        m_pmodel->draw();
+    }
 }
 
 unsigned int compile_shader(unsigned int type, const char* source);
@@ -241,6 +251,8 @@ void Renderer::imgui_draw()
         }
         
         ImGui::PopItemWidth();
+        
+        ImGui::Checkbox("Player View", &isPlayerView);
         
         ImGui::End();
     }
