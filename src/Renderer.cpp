@@ -75,24 +75,23 @@ void Renderer::draw(const Camera& camera)
     
     if (isPlayerView)
     {
-        float zOffset = -8;
-        
-        glm::mat4 weaponMatrix = {
-            {  0,  0, -1,       0 },
-            { -1,  0,  0,       0 },
-            {  0,  1,  0,       0 },
-            {  0,  0,  zOffset, 1 }
+        glm::mat4 quakeToGL = {
+            {  0,  0, -1,  0 },
+            { -1,  0,  0,  0 },
+            {  0,  1,  0,  0 },
+            {  0,  0,  0,  1 }
         };
         
-        glm::mat4 mvp = camera.projection * weaponMatrix;
+        quakeToGL[3] = glm::vec4(weaponOffset, 1);
+        
+        glm::mat4 mvp = camera.projection * quakeToGL;
         glUniformMatrix4fv(u_MVP_loc, 1, GL_FALSE, (const float*) &mvp);
     }
     else
     {
-        // GoldSrc/Quake coordinate system -> OpenGL
         glm::mat4 quakeToGL = {
-            {  0,  0,  1,  0 },
-            {  1,  0,  0,  0 },
+            {  0,  0, -1,  0 },
+            { -1,  0,  0,  0 },
             {  0,  1,  0,  0 },
             {  0,  0,  0,  1 }
         };
@@ -253,6 +252,7 @@ void Renderer::imgui_draw()
         ImGui::PopItemWidth();
         
         ImGui::Checkbox("Player View", &isPlayerView);
+        ImGui::InputFloat3("Weapon offset", (float*)&weaponOffset);
         
         ImGui::End();
     }
